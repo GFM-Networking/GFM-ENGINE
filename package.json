@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "GFM Engine Command Center",
   "main": "main.js",
+  "author": "GFM Network",
   "scripts": {
     "start": "electron .",
-    "pack:mac": "electron-builder --mac dmg zip"
+    "pack:mac": "electron-builder --mac dmg zip --publish never"
   },
   "devDependencies": {
     "electron": "^30.0.0",
@@ -19,17 +20,11 @@
       "target": [
         {
           "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "arch": ["x64", "arm64"]
         },
         {
           "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
+          "arch": ["x64", "arm64"]
         }
       ]
     },
