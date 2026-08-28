@@ -4,8 +4,8 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
       - name: Install Dependencies
@@ -13,7 +13,7 @@ jobs:
       - name: Build DMG
         run: npm run pack:mac
       - name: Upload Installer
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: GFM-Engine-Mac
           path: dist/*.dmg
