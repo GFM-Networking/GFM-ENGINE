@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GFM Engine | Neural Core</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --theme-indigo: #4f46e5;
+            --theme-violet: #8b5cf6;
+            --theme-cyan: #06b6d4;
+            --theme-blue: #3b82f6;
+            --theme-alert: #ef4444;
+            --glass-bg: rgba(255, 255, 255, 0.03); 
+            --glass-blur: blur(40px) saturate(200%); 
+            --glass-border: 1px solid rgba(255, 255, 255, 0.15);
+            --glass-border-top: 1px solid rgba(255, 255, 255, 0.35);
+            --glass-border-left: 1px solid rgba(255, 255, 255, 0.2);
+            --glass-shadow: 0 20px 50px -10px rgba(0, 0, 0, 0.6), 0 0 30px rgba(99, 102, 241, 0.15);
+            --glass-highlight: inset 0 1px 1px rgba(255, 255, 255, 0.3), inset 0 0 20px rgba(139, 92, 246, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #cbd5e1;
+            --spring: cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; color: var(--text-main); height: 100vh; display: flex; overflow: hidden; background-color: #1e1b4b; }
+
+        .ambient-cyberspace { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; background: radial-gradient(circle at 15% 20%, rgba(139, 92, 246, 0.45) 0%, transparent 50%), radial-gradient(circle at 85% 80%, rgba(59, 130, 246, 0.45) 0%, transparent 50%), radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.15) 0%, transparent 60%), linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #2e1065 100%); animation: breatheBg 15s ease-in-out infinite alternate; }
+        @keyframes breatheBg { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
+
+        .grid-floor { position: absolute; bottom: -30%; left: -50%; width: 200%; height: 100%; z-index: 1; background-image: linear-gradient(rgba(139, 92, 246, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(139, 92, 246, 0.15) 1px, transparent 1px); background-size: 60px 60px; transform: perspective(1000px) rotateX(75deg); animation: moveGrid 15s linear infinite; }
+        @keyframes moveGrid { to { transform: perspective(1000px) rotateX(75deg) translateY(60px); } }
+
+        .liquid-glass { background: var(--glass-bg); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); border: var(--glass-border); border-top: var(--glass-border-top); border-left: var(--glass-border-left); box-shadow: var(--glass-shadow), var(--glass-highlight); }
+
+        .sys-icon { width: 20px; height: 20px; display: block; stroke: currentColor; transition: stroke 0.3s var(--spring); }
+        .sys-icon-sm { width: 16px; height: 16px; display: block; stroke: currentColor; }
+        .sys-icon-lg { width: 24px; height: 24px; display: block; stroke: currentColor; }
+
+        #webgl-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; pointer-events: none; }
+
+        #home-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; transition: opacity 0.5s var(--spring), transform 0.5s var(--spring); perspective: 2000px; }
+        .holo-panel { position: absolute; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 10px; transition: transform 0.4s var(--spring), border-color 0.4s; transform-style: preserve-3d; z-index: 10; pointer-events: auto; }
+        .holo-panel:hover { border-color: #fff; box-shadow: var(--glass-shadow), 0 0 40px rgba(139, 92, 246, 0.4); }
+        .panel-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px; color: var(--text-main); text-align: center; margin-bottom: 12px; font-weight: 800; text-shadow: 0 0 10px var(--theme-violet); }
+
+        .panel-left { width: 280px; left: 4vw; top: 35%; transform: translateY(-50%) rotateY(15deg) translateZ(50px); }
+        .panel-right { width: 280px; right: 4vw; top: 35%; transform: translateY(-50%) rotateY(-15deg) translateZ(50px); }
+        .panel-bottom { bottom: 4vh; left: 50%; width: 760px; padding: 18px 24px; transform: translateX(-50%) rotateX(15deg) translateZ(120px); flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 12px; }
+        .panel-bottom .panel-title { width: 100%; margin-bottom: 0; }
+
+        .holo-btn { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-main); padding: 12px 16px; border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.3s var(--spring); display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; }
+        .panel-bottom .holo-btn { width: calc(33.33% - 12px); justify-content: center; padding: 10px 14px; } 
+        .holo-btn:hover { background: rgba(139, 92, 246, 0.25); border-color: #fff; transform: scale(1.04); color: #fff; box-shadow: 0 8px 20px rgba(0,0,0,0.3), 0 0 15px rgba(139, 92, 246, 0.5); }
+        .holo-btn:hover .sys-icon { stroke: var(--theme-cyan); }
+
+        .app-layout { display: none; width: 100%; height: 100%; z-index: 100; padding: 12px; box-sizing: border-box; gap: 12px; animation: slideUp 0.5s var(--spring) forwards; opacity: 0; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px) scale(0.99); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+        .sidebar { width: 66px; flex-shrink: 0; display: flex; flex-direction: column; padding: 24px 12px; z-index: 500; border-radius: 20px; transition: width 0.3s var(--spring), padding 0.3s var(--spring); overflow-x: hidden; overflow-y: auto; white-space: nowrap; position: relative; box-sizing: border-box; }
+        .sidebar::-webkit-scrollbar { display: none; }
+        .sidebar:hover { width: 280px; padding: 24px 20px; box-shadow: 20px 0 50px rgba(0,0,0,0.5), inset -10px 0 20px rgba(139,92,246,0.05); }
+
+        .brand { font-size: 1.4rem; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 24px; display: flex; align-items: center; color: #fff; gap: 14px; overflow: hidden; padding-left: 0; }
+        .brand-text { opacity: 0; transition: opacity 0.2s; text-shadow: 0 0 10px var(--theme-violet); }
+        .sidebar:hover .brand-text { opacity: 1; transition-delay: 0.1s; }
+
+        .home-icon-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; width: 42px; height: 42px; min-width: 42px; border-radius: 12px; cursor: pointer; display: flex; justify-content: center; align-items: center; transition: 0.3s var(--spring); flex-shrink: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .home-icon-btn:hover { background: var(--theme-indigo); border-color: #fff; box-shadow: 0 0 20px rgba(99, 102, 241, 0.6); color: #fff; transform: scale(1.1); }
+
+        .nav-section-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 2px; margin: 12px 0 8px 0; font-weight: 800; opacity: 0; transition: opacity 0.2s; padding-left: 4px; background: linear-gradient(90deg, var(--theme-cyan), #fff, var(--theme-violet), var(--theme-blue), var(--theme-cyan)); background-size: 300% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: textGlow 6s linear infinite; }
+        @keyframes textGlow { to { background-position: 300% center; } }
+        .sidebar:hover .nav-section-title { opacity: 1; transition-delay: 0.1s; }
+
+        .sidebar-btn { display: flex; align-items: center; width: 42px; height: 42px; padding: 0; background: transparent; border: 1px solid transparent; border-radius: 12px; color: var(--text-main); font-size: 0.95rem; font-weight: 600; cursor: pointer; margin-bottom: 6px; transition: all 0.3s var(--spring); text-align: left; box-sizing: border-box; overflow: hidden; }
+        .sidebar:hover .sidebar-btn { width: 100%; padding: 0 16px; }
+        .btn-icon { width: 42px; height: 42px; display: flex; justify-content: center; align-items: center; flex-shrink: 0; transition: 0.3s; }
+        .btn-text { padding-left: 12px; opacity: 0; transition: opacity 0.2s; white-space: nowrap; }
+        .sidebar:hover .btn-text { opacity: 1; transition-delay: 0.1s; }
+        .sidebar-btn:hover { background: rgba(255, 255, 255, 0.1); box-shadow: inset 0 0 10px rgba(255,255,255,0.05); }
+        .sidebar-btn:hover .sys-icon { stroke: var(--theme-cyan); }
+        
+        .sidebar-btn.active-btn { background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(139, 92, 246, 0.35)); border: 1px solid rgba(255, 255, 255, 0.4); color: #fff; box-shadow: 0 4px 15px rgba(0,0,0,0.2), inset 0 0 15px rgba(139, 92, 246, 0.4); }
+        .sidebar-btn.active-btn .sys-icon { stroke: var(--theme-cyan); }
+
+        .main-stage { flex: 1; display: flex; flex-direction: column; position: relative; z-index: 100; border-radius: 16px; overflow: hidden; }
+
+        /* --- DASHBOARD TRACKER VIEW --- */
+        #dashboard-view { display: none; flex-direction: column; height: 100%; padding: 32px; box-sizing: border-box; overflow-y: auto; background: transparent; }
+        .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .dash-title { font-size: 2rem; font-weight: 800; margin: 0; color: #fff; text-shadow: 0 2px 10px rgba(139,92,246,0.5); }
+        .sys-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: 700; transition: 0.3s var(--spring); display: flex; align-items: center; gap: 8px; }
+        .sys-btn:hover { background: var(--theme-indigo); border-color: #fff; transform: scale(1.05); box-shadow: 0 0 15px rgba(99,102,241,0.5); }
+
+        .dash-grid { display: flex; gap: 24px; align-items: flex-start; }
+        .matrix-panel, .form-panel { padding: 32px; border-radius: 20px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .matrix-panel { flex: 2; } .form-panel { flex: 1; }
+
+        .cal-controls { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .cal-month { font-size: 1.6rem; font-weight: 800; margin: 0; color: #fff; }
+        .week-row { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: 700; font-size: 0.9rem; margin-bottom: 12px; color: var(--text-main); }
+        .day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+        .day-node { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; aspect-ratio: 1/1; padding: 12px; display: flex; flex-direction: column; cursor: pointer; transition: 0.3s var(--spring); }
+        .day-node:hover { border-color: #fff; background: rgba(139, 92, 246, 0.2); transform: scale(1.08); box-shadow: 0 10px 20px rgba(139, 92, 246, 0.3); }
+        .day-node.active .day-num { font-weight: 800; color: #fff; font-size: 1.2rem; }
+        .day-node.today { border: 1px solid var(--theme-cyan); background: rgba(6, 182, 212, 0.15); box-shadow: inset 0 0 20px rgba(6, 182, 212, 0.3); }
+        .mission-badge { background: linear-gradient(135deg, var(--theme-indigo), var(--theme-violet)); color: #fff; padding: 4px; border-radius: 6px; font-size: 0.8rem; font-weight: 800; margin-top: auto; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-size: 0.85rem; font-weight: 600; color: var(--text-main); }
+        .clean-input { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 12px; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 0.95rem; transition: 0.3s var(--spring); box-sizing: border-box; }
+        .clean-input:focus { outline: none; border-color: var(--theme-violet); background: rgba(0,0,0,0.6); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.25); }
+        .clean-input[readonly] { color: var(--theme-cyan); border-style: dashed; }
+        select.clean-input option { background: #0f172a; color: #fff; }
+        
+        .execute-btn { width: 100%; background: linear-gradient(135deg, var(--theme-indigo), var(--theme-violet)); color: #fff; border: none; border-radius: 10px; padding: 14px; font-weight: 800; font-size: 1.05rem; cursor: pointer; transition: 0.3s var(--spring); box-shadow: 0 10px 20px rgba(99, 102, 241, 0.4); margin-top: 12px; }
+        .execute-btn:hover { filter: brightness(1.2); transform: translateY(-3px); box-shadow: 0 15px 30px rgba(139, 92, 246, 0.5); }
+        .execute-btn.clear-btn:hover { background: #ef4444 !important; color: #fff !important; box-shadow: 0 10px 20px rgba(239, 68, 68, 0.4) !important; border-color: #ef4444 !important; }
+
+        @keyframes flashFill { 0% { background: rgba(6, 182, 212, 0.6); box-shadow: 0 0 15px var(--theme-cyan); border-color: #fff; } 100% { background: rgba(0,0,0,0.4); box-shadow: none; border-color: rgba(255,255,255,0.2); } }
+        .flash-input { animation: flashFill 0.8s ease-out forwards; }
+
+        /* --- IMMERSIVE BROWSER VIEW --- */
+        #browser-view { display: none; flex-direction: column; height: 100%; width: 100%; position: relative; background: transparent; border-radius: 16px; overflow: hidden; transform-origin: center center; transition: opacity 0.3s ease-out; }
+        
+        .browser-header { position: relative; z-index: 200; height: 46px; flex-shrink: 0; display: flex; align-items: center; padding: 0 12px; gap: 12px; border-radius: 16px 16px 0 0; border-bottom: 1px solid rgba(255,255,255,0.15); background: rgba(255, 255, 255, 0.08); backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .nav-controls { display: flex; gap: 6px; }
+        .icon-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: var(--text-main); width: 30px; height: 30px; border-radius: 8px; cursor: pointer; transition: 0.3s var(--spring); display: flex; align-items: center; justify-content: center; }
+        .icon-btn:hover { background: var(--theme-indigo); color: #fff; border-color: #fff; box-shadow: 0 0 10px rgba(99, 102, 241, 0.5); }
+        #cookie-btn:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
+        #cookie-btn:hover .sys-icon-sm { stroke: #ef4444; }
+
+        #dialer-script-controls { display: none; align-items: center; gap: 8px; margin-left: 8px; padding-left: 12px; border-left: 1px solid rgba(255,255,255,0.2); flex: 1;}
+        .script-btn { background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.3); color: #fff; height: 30px; border-radius: 8px; cursor: pointer; transition: 0.3s var(--spring); display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; font-size: 0.8rem; font-weight: 700; }
+        .script-btn:hover, .script-btn.active-script { background: var(--theme-violet); border-color: #fff; box-shadow: 0 0 15px rgba(139, 92, 246, 0.5); }
+
+        .spin { animation: rotate 0.5s var(--spring); }
+        @keyframes rotate { 100% { transform: rotate(360deg); } }
+
+        .tab-bar { display: flex; gap: 6px; flex: 1; overflow-x: auto; height: 100%; align-items: flex-end; padding-bottom: 6px; scrollbar-width: none; justify-content: flex-end;}
+        .tab-bar::-webkit-scrollbar { display: none; }
+        
+        .glass-tab { height: 32px; display: flex; align-items: center; gap: 10px; padding: 0 14px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; cursor: pointer; color: var(--text-main); font-size: 0.8rem; font-weight: 600; transition: 0.3s var(--spring); white-space: nowrap; max-width: 220px; }
+        .glass-tab:hover { background: rgba(255, 255, 255, 0.15); color: #fff; border-color: rgba(139, 92, 246, 0.5); }
+        .glass-tab.active-tab { background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(139, 92, 246, 0.4)); color: #fff; border-color: #fff; box-shadow: 0 0 15px rgba(139, 92, 246, 0.4), inset 0 1px 1px #fff; }
+        .glass-tab.active-tab .sys-icon-sm { stroke: #fff; }
+        
+        .tab-title { overflow: hidden; text-overflow: ellipsis; }
+        .tab-x { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; transition: 0.2s; font-size: 1.1rem; opacity: 0.7; }
+        .tab-x:hover { opacity: 1; color: #fff; background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+
+        .webview-container { flex: 1; width: 100%; position: relative; z-index: 10; background: transparent; border-radius: 0 0 16px 16px; overflow: hidden; }
+        .app-webview { width: 100%; height: 100%; border: none; display: none; background: #fff; }
+        .app-webview.active-wv { display: flex; }
+
+        /* THE SCRIPT SLIDE-UP OVERLAY */
+        #script-overlay { display: none; position: absolute; top: 46px; left: 0; width: 100%; height: calc(100% - 46px); z-index: 300; flex-direction: column; overflow: hidden; border-radius: 0 0 16px 16px; transform: translateY(100%); transition: transform 0.4s var(--spring); }
+        #script-overlay.open { transform: translateY(0); }
+        .overlay-hud { height: 46px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; background: rgba(0,0,0,0.8); border-bottom: 1px solid rgba(255,255,255,0.2); flex-shrink: 0; }
+        .hud-badge { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); padding: 4px 10px; border-radius: 8px; display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: #fff; }
+
+        /* --- THE DRAGGABLE QUICK CALLBACK OVERLAY --- */
+        #quick-callback-overlay {
+            display: none; position: absolute; top: 60px; right: 24px; width: 440px; max-height: calc(100vh - 100px);
+            overflow-y: auto; z-index: 600; padding: 24px; border-radius: 20px;
+            background: rgba(15, 23, 42, 0.9); border: var(--glass-border);
+            box-shadow: 0 30px 60px rgba(0,0,0,0.8), 0 0 30px rgba(99, 102, 241, 0.2);
+            backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+            transition: opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+            opacity: 0; transform: translateY(-10px); box-sizing: border-box;
+        }
+        #quick-callback-overlay.open { display: flex; flex-direction: column; opacity: 1; transform: translateY(0); }
+        
+        .qc-drag-handle { cursor: grab; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; user-select: none; -webkit-user-select: none; }
+        .qc-drag-handle:active { cursor: grabbing; }
+        
+        .auto-fill-btn { background: linear-gradient(135deg, var(--theme-cyan), var(--theme-blue)); color: #fff; border: none; padding: 10px 16px; border-radius: 10px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.3s; box-shadow: 0 5px 15px rgba(6, 182, 212, 0.4); }
+        .auto-fill-btn:hover { transform: scale(1.05); filter: brightness(1.2); }
+
+        /* OMNI-CORE COMMAND BAR */
+        #omni-core-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); backdrop-filter: blur(10px); z-index: 5000; display: none; justify-content: center; align-items: flex-start; padding-top: 15vh; opacity: 0; transition: opacity 0.2s; }
+        .omni-bar { width: 700px; padding: 20px; border-radius: 20px; border: var(--glass-neon-border); transform: translateY(-20px); transition: transform 0.3s var(--spring); }
+        .omni-input { width: 100%; background: transparent; border: none; color: #fff; font-size: 2rem; font-family: 'Inter', sans-serif; font-weight: 300; outline: none; }
+        .omni-input::placeholder { color: rgba(255,255,255,0.3); }
+        .omni-results { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; }
+        .omni-item { padding: 16px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; gap: 16px; font-size: 1.1rem; color: var(--text-muted); transition: 0.2s; }
+        .omni-item.selected, .omni-item:hover { background: rgba(139, 92, 246, 0.25); color: #fff; border-left: 4px solid var(--theme-indigo); box-shadow: inset 0 0 20px rgba(139, 92, 246, 0.2); }
+
+        /* DRAGGABLE GEMINI WINDOW */
+        #gemini-floating-window { position: absolute; top: 80px; right: 80px; width: 420px; height: 650px; z-index: 9999; border-radius: 16px; display: none; flex-direction: column; overflow: hidden; box-shadow: 0 30px 60px rgba(0,0,0,0.7); border: var(--glass-neon-border); }
+        .gemini-drag-handle { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; cursor: grab; background: rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.15); user-select: none; -webkit-user-select: none; }
+        .gemini-drag-handle:active { cursor: grabbing; }
+        .gemini-webview { flex: 1; border: none; background: #fff; }
+
+        /* Data Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(20px); justify-content: center; align-items: center; z-index: 10000; }
+        .modal-box { padding: 40px; width: 600px; border-radius: 24px; border: var(--glass-neon-border); box-shadow: 0 0 50px rgba(99, 102, 241, 0.3); }
+        .data-card { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); border-left: 3px solid var(--theme-violet); padding: 24px; margin-bottom: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .data-card button { background: rgba(239, 68, 68, 0.15); border: 1px solid #ef4444; color: #ef4444; padding: 10px 20px; border-radius: 10px; cursor: pointer; transition: 0.2s; font-weight: 700; }
+        .data-card button:hover { background: #ef4444; color: #fff; transform: scale(1.05); box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+    </style>
+</head>
+<body>
+
+    <!-- INLINE SVG SPRITE MAP -->
+    <svg style="display: none;" xmlns="http://www.w3.org/2000/svg">
+        <symbol id="icon-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/><path d="M14.5 2A2.5 2.5 0 0 0 12 4.5v15a2.5 2.5 0 0 0 4.96.44 2.5 2.5 0 0 0 2.96-3.08 3 3 0 0 0 .34-5.58 2.5 2.5 0 0 0-1.32-4.24 2.5 2.5 0 0 0-1.98-3A2.5 2.5 0 0 0 14.5 2Z"/></symbol>
+        <symbol id="icon-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></symbol>
+        <symbol id="icon-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></symbol>
+        <symbol id="icon-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></symbol>
+        <symbol id="icon-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></symbol>
+        <symbol id="icon-briefcase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></symbol>
+        <symbol id="icon-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></symbol>
+        <symbol id="icon-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></symbol>
+        <symbol id="icon-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></symbol>
+        <symbol id="icon-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></symbol>
+        <symbol id="icon-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></symbol>
+        <symbol id="icon-monitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></symbol>
+        <symbol id="icon-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></symbol>
+        <symbol id="icon-script" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="13 2 13 9 20 9"></polyline></symbol>
+        <symbol id="icon-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></symbol>
+        <symbol id="icon-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></symbol>
+        <symbol id="icon-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></symbol>
+        <symbol id="icon-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></symbol>
+        <symbol id="icon-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></symbol>
+    </svg>
+
+    <div id="boot-screen"><div class="boot-line"></div></div>
+
+    <div class="ambient-cyberspace" id="bg-parallax"></div>
+    <div class="grid-floor" id="grid-parallax"></div>
+
+    <div id="webgl-container"></div>
+
+    <!-- DRAGGABLE NEURAL LINK WINDOW -->
+    <div id="gemini-floating-window" class="liquid-glass">
+        <div class="gemini-drag-handle" id="gemini-drag-handle">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <svg class="sys-icon-sm" style="stroke: var(--theme-cyan);"><use href="#icon-brain"></use></svg>
+                <span style="font-size: 0.8rem; font-weight: 700; letter-spacing: 1px; color: #fff;">Neural Link</span>
+            </div>
+            <button class="icon-btn" onclick="document.getElementById('gemini-floating-window').style.display='none'" style="width: 26px; height: 26px; min-height: 26px;">
+                <svg class="sys-icon-sm"><use href="#icon-x"></use></svg>
+            </button>
+        </div>
+        <webview class="gemini-webview" src="https://gemini.google.com/app" useragent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"></webview>
+    </div>
+
+    <!-- OMNI-CORE COMMAND BAR -->
+    <div id="omni-core-overlay">
+        <div class="omni-bar liquid-glass" id="omni-bar-container">
+            <input type="text" class="omni-input" id="omni-search" placeholder="Enter System Command..." autocomplete="off">
+            <div class="omni-results" id="omni-results"></div>
+        </div>
+    </div>
+
+    <!-- 1. THE 3D NEURAL HOME SCREEN -->
+    <div id="home-screen">
+        <div class="holo-panel liquid-glass panel-left">
+            <div class="panel-title">Workspace</div>
+            <button class="holo-btn" onclick="openSection('tracker')"><svg class="sys-icon"><use href="#icon-calendar"></use></svg> Callbacks</button>
+            <button class="holo-btn" onclick="openSection('dialer')"><svg class="sys-icon"><use href="#icon-phone"></use></svg> The Dialer</button>
+            <button class="holo-btn" onclick="openSection('gmail')"><svg class="sys-icon"><use href="#icon-mail"></use></svg> Gmail</button>
+            <button class="holo-btn" onclick="openSection('google')"><svg class="sys-icon"><use href="#icon-search"></use></svg> Google Search</button>
+        </div>
+
+        <div class="holo-panel liquid-glass panel-right">
+            <div class="panel-title">Quoting & Portals</div>
+            <button class="holo-btn" onclick="openSection('toolkits')"><svg class="sys-icon"><use href="#icon-briefcase"></use></svg> Ins. Toolkits</button>
+            <button class="holo-btn" onclick="openSection('ethos')"><svg class="sys-icon"><use href="#icon-shield"></use></svg> Ethos</button>
+            <button class="holo-btn" onclick="openSection('amam-app')"><svg class="sys-icon"><use href="#icon-file"></use></svg> AmAm App</button>
+            <button class="holo-btn" onclick="openSection('amam-login')"><svg class="sys-icon"><use href="#icon-lock"></use></svg> AmAm Login</button>
+            <button class="holo-btn" onclick="openSection('combined')"><svg class="sys-icon"><use href="#icon-layers"></use></svg> Combined</button>
+            <button class="holo-btn" onclick="openSection('aetna')"><svg class="sys-icon"><use href="#icon-heart"></use></svg> Aetna</button>
+        </div>
+
+        <div class="holo-panel liquid-glass panel-bottom">
+            <div class="panel-title">Resources & Scripts</div>
+            <button class="holo-btn" onclick="openSection('closio')"><svg class="sys-icon"><use href="#icon-monitor"></use></svg> Agent Space</button>
+            <button class="holo-btn" onclick="openSection('whatsapp')"><svg class="sys-icon"><use href="#icon-message"></use></svg> WhatsApp</button>
+            <button class="holo-btn" onclick="openSection('script-zac')"><svg class="sys-icon"><use href="#icon-script"></use></svg> Zaccari Script</button>
+            <button class="holo-btn" onclick="openSection('script-carter')"><svg class="sys-icon"><use href="#icon-script"></use></svg> Carter Script</button>
+            <button class="holo-btn" onclick="openSection('script-solid')"><svg class="sys-icon"><use href="#icon-script"></use></svg> Solidification</button>
+        </div>
+    </div>
+
+    <!-- 2. THE MAXIMIZED APP WORKSPACE -->
+    <div class="app-layout" id="main-app-layout">
+        
+        <!-- ULTRA-SLIM COLLAPSIBLE SIDEBAR -->
+        <aside class="sidebar liquid-glass">
+            <div class="brand">
+                <button class="home-icon-btn" onclick="goHome()" title="Return to Core">
+                    <svg class="sys-icon-lg"><use href="#icon-brain"></use></svg>
+                </button>
+                <span class="brand-text">GFM Engine</span>
+            </div>
+            
+            <div class="nav-section-title">Workspace</div>
+            <button class="sidebar-btn" data-section="tracker" onclick="openSection('tracker')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-calendar"></use></svg></div><span class="btn-text">Callbacks</span>
+            </button>
+            <button class="sidebar-btn" data-section="dialer" onclick="openSection('dialer')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-phone"></use></svg></div><span class="btn-text">The Dialer</span>
+            </button>
+            <button class="sidebar-btn" data-section="gmail" onclick="openSection('gmail')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-mail"></use></svg></div><span class="btn-text">Gmail</span>
+            </button>
+            <button class="sidebar-btn" data-section="google" onclick="openSection('google')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-search"></use></svg></div><span class="btn-text">Google Search</span>
+            </button>
+            
+            <div class="nav-section-title">Quoting & Portals</div>
+            <button class="sidebar-btn" data-section="toolkits" onclick="openSection('toolkits')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-briefcase"></use></svg></div><span class="btn-text">Ins. Toolkits</span>
+            </button>
+            <button class="sidebar-btn" data-section="ethos" onclick="openSection('ethos')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-shield"></use></svg></div><span class="btn-text">Ethos</span>
+            </button>
+            <button class="sidebar-btn" data-section="amam-app" onclick="openSection('amam-app')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-file"></use></svg></div><span class="btn-text">AmAm App</span>
+            </button>
+            <button class="sidebar-btn" data-section="amam-login" onclick="openSection('amam-login')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-lock"></use></svg></div><span class="btn-text">AmAm Login</span>
+            </button>
+            <button class="sidebar-btn" data-section="combined" onclick="openSection('combined')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-layers"></use></svg></div><span class="btn-text">Combined</span>
+            </button>
+            <button class="sidebar-btn" data-section="aetna" onclick="openSection('aetna')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-heart"></use></svg></div><span class="btn-text">Aetna</span>
+            </button>
+
+            <div class="nav-section-title">Resources & Scripts</div>
+            <button class="sidebar-btn" data-section="closio" onclick="openSection('closio')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-monitor"></use></svg></div><span class="btn-text">Agent Space</span>
+            </button>
+            <button class="sidebar-btn" data-section="whatsapp" onclick="openSection('whatsapp')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-message"></use></svg></div><span class="btn-text">WhatsApp</span>
+            </button>
+            <button class="sidebar-btn" data-section="script-zac" onclick="openSection('script-zac')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-script"></use></svg></div><span class="btn-text">Zaccari Script</span>
+            </button>
+            <button class="sidebar-btn" data-section="script-carter" onclick="openSection('script-carter')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-script"></use></svg></div><span class="btn-text">Carter Script</span>
+            </button>
+            <button class="sidebar-btn" data-section="script-solid" onclick="openSection('script-solid')">
+                <div class="btn-icon"><svg class="sys-icon"><use href="#icon-script"></use></svg></div><span class="btn-text">Solidification</span>
+            </button>
+        </aside>
+
+        <main class="main-stage">
+            
+            <!-- MAIN TRACKER VIEW -->
+            <div id="dashboard-view" class="liquid-glass">
+                <header class="dash-header">
+                    <h2 class="dash-title" id="current-date-display">System Overview</h2>
+                    <div style="display: flex; gap: 16px;">
+                        <button class="sys-btn" onclick="exportData()">
+                            <svg class="sys-icon-sm"><use href="#icon-layers"></use></svg> Backup
+                        </button>
+                        <button class="sys-btn" onclick="document.getElementById('importFileInput').click()">
+                            <svg class="sys-icon-sm"><use href="#icon-refresh"></use></svg> Restore
+                        </button>
+                        <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="importData(event)">
+                    </div>
+                </header>
+
+                <div class="dash-grid">
+                    <div class="matrix-panel">
+                        <div class="cal-controls">
+                            <button class="sys-btn" id="prev-month"><svg class="sys-icon-sm"><use href="#icon-arrow-left"></use></svg></button>
+                            <h2 class="cal-month" id="month-year">August 2026</h2>
+                            <button class="sys-btn" id="next-month"><svg class="sys-icon-sm"><use href="#icon-arrow-right"></use></svg></button>
+                        </div>
+                        <div class="week-row"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+                        <div class="day-grid" id="calendar-grid"></div>
+                    </div>
+
+                    <div class="form-panel">
+                        <h3 style="margin-top: 0; margin-bottom: 24px; font-size: 1.4rem; color: #fff;">Add Target</h3>
+                        <form id="callback-form">
+                            <div style="display: flex; gap: 16px;">
+                                <div class="form-group" style="flex: 1;"><label>Agent</label><select class="clean-input" id="agentName" onchange="updateAgentPhone()"><option value="Danny Koeth">Danny Koeth</option><option value="Carter Smith">Carter Smith</option></select></div>
+                                <div class="form-group" style="flex: 1;"><label>Agent's Number</label><input type="text" class="clean-input" id="agentPhone" value="(352) 652-1344" readonly></div>
+                            </div>
+                            <div style="display: flex; gap: 16px;">
+                                <div class="form-group" style="flex: 2;"><label>Client Name</label><input type="text" class="clean-input" id="clientName" required placeholder="Full Name"></div>
+                                <div class="form-group" style="flex: 2;"><label>Phone</label><input type="tel" class="clean-input" id="clientPhone" required placeholder="(555) 000-0000"></div>
+                                <div class="form-group" style="flex: 1;">
+                                    <label>State</label>
+                                    <select class="clean-input" id="clientState" required>
+                                        <option value="AL">AL</option><option value="AK">AK</option><option value="AZ">AZ</option><option value="AR">AR</option>
+                                        <option value="CA">CA</option><option value="CO">CO</option><option value="CT">CT</option><option value="DE">DE</option>
+                                        <option value="FL" selected>FL</option><option value="GA">GA</option><option value="HI">HI</option><option value="ID">ID</option>
+                                        <option value="IL">IL</option><option value="IN">IN</option><option value="IA">IA</option><option value="KS">KS</option>
+                                        <option value="KY">KY</option><option value="LA">LA</option><option value="ME">ME</option><option value="MD">MD</option>
+                                        <option value="MA">MA</option><option value="MI">MI</option><option value="MN">MN</option><option value="MS">MS</option>
+                                        <option value="MO">MO</option><option value="MT">MT</option><option value="NE">NE</option><option value="NV">NV</option>
+                                        <option value="NH">NH</option><option value="NJ">NJ</option><option value="NM">NM</option><option value="NY">NY</option>
+                                        <option value="NC">NC</option><option value="ND">ND</option><option value="OH">OH</option><option value="OK">OK</option>
+                                        <option value="OR">OR</option><option value="PA">PA</option><option value="RI">RI</option><option value="SC">SC</option>
+                                        <option value="SD">SD</option><option value="TN">TN</option><option value="TX">TX</option><option value="UT">UT</option>
+                                        <option value="VT">VT</option><option value="VA">VA</option><option value="WA">WA</option><option value="WV">WV</option>
+                                        <option value="WI">WI</option><option value="WY">WY</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 16px;">
+                                <div class="form-group" style="flex: 1;"><label>Date</label><input type="date" class="clean-input" id="callbackDate" required></div>
+                                <div class="form-group" style="flex: 1;"><label>Time</label><input type="time" class="clean-input" id="callbackTime" required></div>
+                                <div class="form-group" style="flex: 1.2;"><label>Time Zone Context</label><select class="clean-input" id="timeZoneContext"><option value="client">Client's Local</option><option value="est">EST (Our Time)</option></select></div>
+                            </div>
+                            <div class="form-group"><label>Policy Type</label><select class="clean-input" id="policyType"><option>Whole Life</option><option>Term Life</option><option>SIUL</option></select></div>
+                            <div class="form-group"><label>Notes</label><textarea class="clean-input" id="notes" rows="2" placeholder="Discussion points..."></textarea></div>
+                            <div class="form-group"><label>SMS Confirmation</label><select class="clean-input" id="smsConfirm"><option>1 Day Prior</option><option>2 Hours Prior</option><option>None</option></select></div>
+                            
+                            <div style="display: flex; gap: 12px; margin-top: 12px;">
+                                <button type="button" onclick="clearMainForm()" class="execute-btn clear-btn" style="flex: 1; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); box-shadow: none; margin-top: 0; color: #ef4444;">Clear</button>
+                                <button type="submit" class="execute-btn" style="flex: 2; margin-top: 0;">Save Callback</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IMMERSIVE BROWSER VIEW -->
+            <div id="browser-view">
+                <header class="browser-header liquid-glass">
+                    <div class="nav-controls">
+                        <button class="icon-btn" onclick="browserBack()" title="Back"><svg class="sys-icon-sm"><use href="#icon-arrow-left"></use></svg></button>
+                        <button class="icon-btn" onclick="browserForward()" title="Forward"><svg class="sys-icon-sm"><use href="#icon-arrow-right"></use></svg></button>
+                        <button class="icon-btn" id="refresh-icon" onclick="browserRefresh()" title="Refresh"><svg class="sys-icon-sm"><use href="#icon-refresh"></use></svg></button>
+                        <button class="icon-btn" id="cookie-btn" onclick="clearDialerCookies()" title="Purge Dialer Cookies" style="display: none;"><svg class="sys-icon-sm"><use href="#icon-trash"></use></svg></button>
+                    </div>
+                    
+                    <!-- SCRIPT & QUICK CALLBACK BUTTONS -->
+                    <div id="dialer-script-controls">
+                        <button class="script-btn" onclick="openScriptOverlay('script-zac')"><svg class="sys-icon-sm"><use href="#icon-script"></use></svg> Zac</button>
+                        <button class="script-btn" onclick="openScriptOverlay('script-carter')"><svg class="sys-icon-sm"><use href="#icon-script"></use></svg> Carter</button>
+                        <button class="script-btn" onclick="openScriptOverlay('script-solid')"><svg class="sys-icon-sm"><use href="#icon-script"></use></svg> Solid</button>
+                        
+                        <div style="flex: 1;"></div> 
+
+                        <button class="script-btn" onclick="toggleQuickCallback()" style="background: linear-gradient(135deg, var(--theme-blue), var(--theme-cyan)); border: none;">
+                            <svg class="sys-icon-sm"><use href="#icon-calendar"></use></svg> Quick Callback
+                        </button>
+                    </div>
+
+                    <div class="tab-bar" id="tab-container"></div>
+                </header>
+
+                <!-- THE SCRIPT SLIDE-UP OVERLAY -->
+                <div id="script-overlay" class="liquid-glass">
+                    <div class="overlay-hud">
+                        <div style="display: flex; gap: 16px; align-items: center;">
+                            <span style="color: var(--theme-cyan); font-weight: 800; font-size: 1.1rem;" id="overlay-script-title">Script</span>
+                            <div class="hud-badge">State: <span id="overlay-state" style="color: var(--theme-cyan); font-weight: 800;">Scanning...</span></div>
+                            <div class="hud-badge">Called In: <span id="overlay-time" style="color: var(--theme-cyan); font-weight: 800;">Scanning...</span></div>
+                            <button class="icon-btn" onclick="extractLeadDataForOverlay()" title="Rescan Dialer Lead" style="width: 28px; height: 28px; border-color: rgba(255,255,255,0.2);">
+                                <svg class="sys-icon-sm"><use href="#icon-refresh"></use></svg>
+                            </button>
+                        </div>
+                        <button class="icon-btn" onclick="closeScriptOverlay()" style="background: rgba(239, 68, 68, 0.2); color: #ef4444; border-color: #ef4444; width: 28px; height: 28px;">
+                            <svg class="sys-icon-sm"><use href="#icon-x"></use></svg>
+                        </button>
+                    </div>
+                    <div id="overlay-webview-container" style="flex: 1; position: relative;"></div>
+                </div>
+
+                <!-- DRAGGABLE QUICK CALLBACK OVERLAY -->
+                <div id="quick-callback-overlay" class="liquid-glass">
+                    <div class="qc-drag-handle" id="qc-drag-handle">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <svg class="sys-icon-sm" style="stroke: var(--theme-cyan);"><use href="#icon-calendar"></use></svg>
+                            <h3 style="margin: 0; color: #fff; font-size: 1.1rem;">Quick Callback</h3>
+                        </div>
+                        <button class="auto-fill-btn" id="qc-autofill-btn" onclick="triggerQuickAutoFill(event)">
+                            <svg class="sys-icon-sm"><use href="#icon-refresh"></use></svg> Auto-Fill Data
+                        </button>
+                    </div>
+                    <form id="qc-callback-form">
+                        <div style="display: flex; gap: 12px;">
+                            <div class="form-group" style="flex: 1;"><label>Agent</label><select class="clean-input" id="qc-agentName" onchange="qcUpdateAgentPhone()"><option value="Danny Koeth">Danny Koeth</option><option value="Carter Smith">Carter Smith</option></select></div>
+                            <div class="form-group" style="flex: 1;"><label>Agent's Number</label><input type="text" class="clean-input" id="qc-agentPhone" value="(352) 652-1344" readonly></div>
+                        </div>
+                        <div class="form-group"><label>Client Name</label><input type="text" class="clean-input" id="qc-clientName" required placeholder="Full Name"></div>
+                        <div style="display: flex; gap: 12px;">
+                            <div class="form-group" style="flex: 2;"><label>Phone</label><input type="tel" class="clean-input" id="qc-clientPhone" required placeholder="(555) 000-0000"></div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>State</label>
+                                <select class="clean-input" id="qc-clientState" required>
+                                    <option value="AL">AL</option><option value="AK">AK</option><option value="AZ">AZ</option><option value="AR">AR</option>
+                                    <option value="CA">CA</option><option value="CO">CO</option><option value="CT">CT</option><option value="DE">DE</option>
+                                    <option value="FL" selected>FL</option><option value="GA">GA</option><option value="HI">HI</option><option value="ID">ID</option>
+                                    <option value="IL">IL</option><option value="IN">IN</option><option value="IA">IA</option><option value="KS">KS</option>
+                                    <option value="KY">KY</option><option value="LA">LA</option><option value="ME">ME</option><option value="MD">MD</option>
+                                    <option value="MA">MA</option><option value="MI">MI</option><option value="MN">MN</option><option value="MS">MS</option>
+                                    <option value="MO">MO</option><option value="MT">MT</option><option value="NE">NE</option><option value="NV">NV</option>
+                                    <option value="NH">NH</option><option value="NJ">NJ</option><option value="NM">NM</option><option value="NY">NY</option>
+                                    <option value="NC">NC</option><option value="ND">ND</option><option value="OH">OH</option><option value="OK">OK</option>
+                                    <option value="OR">OR</option><option value="PA">PA</option><option value="RI">RI</option><option value="SC">SC</option>
+                                    <option value="SD">SD</option><option value="TN">TN</option><option value="TX">TX</option><option value="UT">UT</option>
+                                    <option value="VT">VT</option><option value="VA">VA</option><option value="WA">WA</option><option value="WV">WV</option>
+                                    <option value="WI">WI</option><option value="WY">WY</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                            <div class="form-group" style="flex: 1;"><label>Date</label><input type="date" class="clean-input" id="qc-callbackDate" required></div>
+                            <div class="form-group" style="flex: 1;"><label>Time</label><input type="time" class="clean-input" id="qc-callbackTime" required></div>
+                        </div>
+                        <div style="display: flex; gap: 12px;">
+                            <div class="form-group" style="flex: 1.2;"><label>Time Zone Context</label><select class="clean-input" id="qc-timeZoneContext"><option value="client">Client's Local</option><option value="est">EST (Our Time)</option></select></div>
+                            <div class="form-group" style="flex: 1;"><label>Policy Type</label><select class="clean-input" id="qc-policyType"><option>Whole Life</option><option>Term Life</option><option>SIUL</option></select></div>
+                        </div>
+                        <div class="form-group"><label>Notes</label><textarea class="clean-input" id="qc-notes" rows="2" placeholder="Discussion points..."></textarea></div>
+                        <div class="form-group"><label>SMS Confirmation</label><select class="clean-input" id="qc-smsConfirm"><option>1 Day Prior</option><option>2 Hours Prior</option><option>None</option></select></div>
+                        
+                        <div style="display: flex; gap: 12px; margin-top: 12px;">
+                            <button type="button" onclick="toggleQuickCallback()" class="execute-btn clear-btn" style="flex: 1; background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.3); box-shadow: none; margin-top: 0; color: #fff;">Close</button>
+                            <button type="button" onclick="clearQCForm()" class="execute-btn clear-btn" style="flex: 1; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.5); box-shadow: none; margin-top: 0; color: #ef4444;">Clear</button>
+                            <button type="submit" class="execute-btn" style="flex: 2; margin-top: 0;"><svg class="sys-icon-sm" style="display: inline; margin-bottom: -2px;"><use href="#icon-send"></use></svg> Save & Send</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="webview-container" id="webview-container"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Data Modal -->
+    <div class="modal" id="detailsModal">
+        <div class="modal-box liquid-glass">
+            <h3 id="modalDateTitle" style="margin-top: 0; font-size: 1.8rem; color: #fff;">Callbacks</h3>
+            <div id="modalList"></div>
+            <button onclick="document.getElementById('detailsModal').style.display='none'" style="margin-top: 24px; width: 100%; padding: 16px; background: #fff; color: #000; border: none; border-radius: 12px; cursor: pointer; transition: 0.3s; font-weight: 800; font-size: 1.1rem;">Close Details</button>
+        </div>
+    </div>
+
+    <script>
+        const { ipcRenderer } = require('electron');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                document.getElementById('boot-screen').style.opacity = '0';
+                initThreeJSBrain();
+            }, 1000);
+        });
+
+        function initThreeJSBrain() {
+            const container = document.getElementById('webgl-container');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 250; camera.position.y = 10;
+
+            const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            const brainGroup = new THREE.Group();
+            scene.add(brainGroup);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+            scene.add(ambientLight);
+            const pointLight = new THREE.PointLight(0x06b6d4, 3, 400);
+            pointLight.position.set(50, 100, 50);
+            scene.add(pointLight);
+
+            const particleCount = 6000;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const vectors = [];
+
+            const colorCyan = new THREE.Color(0x06b6d4);
+            const colorPurple = new THREE.Color(0xd946ef);
+
+            for (let i = 0; i < particleCount; i++) {
+                let u = Math.random() * Math.PI * 2;
+                let v = Math.acos((Math.random() * 2) - 1);
+                
+                let x = 60 * Math.sin(v) * Math.cos(u);
+                let y = 45 * Math.sin(v) * Math.sin(u);
+                let z = 70 * Math.cos(v);
+
+                if (z > 0) { x *= (1 - 0.2 * (z / 70)); y *= (1 - 0.1 * (z / 70)); }
+                if (z < 0) { x *= (1 - 0.05 * (z / 70)); }
+                if (Math.abs(x) < 5) { x = (x > 0) ? x + 4 : x - 4; y -= 10; }
+                let fill = Math.pow(Math.random(), 1/3);
+                x *= fill; y *= fill; z *= fill;
+
+                positions[i * 3] = x; positions[i * 3 + 1] = y; positions[i * 3 + 2] = z;
+                vectors.push(new THREE.Vector3(x, y, z));
+
+                let mixedColor = colorCyan.clone().lerp(colorPurple, Math.random());
+                colors[i * 3] = mixedColor.r; colors[i * 3 + 1] = mixedColor.g; colors[i * 3 + 2] = mixedColor.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 1.5, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, opacity: 0.8, sizeAttenuation: true
+            });
+
+            const brainParticles = new THREE.Points(geometry, material);
+            brainGroup.add(brainParticles);
+
+            const shellGeo = new THREE.SphereGeometry(65, 32, 32);
+            const shellMat = new THREE.MeshPhysicalMaterial({
+                color: 0x8b5cf6, transparent: true, opacity: 0.15,
+                roughness: 0.1, transmission: 0.9, thickness: 0.5, wireframe: true
+            });
+            const shell = new THREE.Mesh(shellGeo, shellMat);
+            shell.scale.set(0.95, 0.72, 1.1); 
+            brainGroup.add(shell);
+
+            const paths = [];
+            for(let i=0; i<250; i++) {
+                let pathNodes = [];
+                let currentVec = vectors[Math.floor(Math.random() * particleCount)];
+                pathNodes.push(currentVec);
+                
+                for(let step=0; step<8; step++) {
+                    let neighbor = null;
+                    for(let j=0; j<80; j++) {
+                        let candidate = vectors[Math.floor(Math.random() * particleCount)];
+                        let dist = currentVec.distanceTo(candidate);
+                        if(dist < 15 && dist > 2 && !pathNodes.includes(candidate)) {
+                            neighbor = candidate; 
+                            break;
+                        }
+                    }
+                    if(neighbor) {
+                        pathNodes.push(neighbor);
+                        currentVec = neighbor;
+                    } else break;
+                }
+                if(pathNodes.length >= 4) {
+                    paths.push(new THREE.CatmullRomCurve3(pathNodes));
+                }
+            }
+
+            const signals = [];
+            const signalCount = 21;
+            for(let i=0; i<signalCount; i++) {
+                const geo = new THREE.BufferGeometry();
+                const tailLength = 15;
+                const pos = new Float32Array(tailLength * 3);
+                geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                const mat = new THREE.LineBasicMaterial({ 
+                    color: 0x00ffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending 
+                });
+                const line = new THREE.Line(geo, mat);
+                brainGroup.add(line);
+
+                let curve = paths.length > 0 ? paths[Math.floor(Math.random() * paths.length)] : null;
+                signals.push({
+                    line: line, curve: curve,
+                    progress: Math.random(), 
+                    speed: 0.003 + Math.random() * 0.002 
+                });
+            }
+
+            brainGroup.position.y = 45; 
+
+            function animate() {
+                requestAnimationFrame(animate);
+                brainGroup.rotation.y += 0.001;
+                
+                if (paths.length > 0) {
+                    for(let i=0; i<signalCount; i++) {
+                        let sig = signals[i];
+                        if(!sig.curve) continue;
+                        
+                        sig.progress += sig.speed;
+                        if(sig.progress > 1.0) {
+                            sig.progress = 0;
+                            sig.curve = paths[Math.floor(Math.random() * paths.length)];
+                            sig.speed = 0.003 + Math.random() * 0.002;
+                        }
+
+                        const posAttr = sig.line.geometry.attributes.position;
+                        for(let j=0; j<15; j++) {
+                            let t = Math.max(0, sig.progress - (j * 0.008)); 
+                            let point = sig.curve.getPoint(t);
+                            posAttr.setXYZ(j, point.x, point.y, point.z);
+                        }
+                        posAttr.needsUpdate = true;
+                    }
+                }
+
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+
+        // --- 3. OMNI-CORE LOGIC ---
+        const appDictionary = {
+            'tracker': { url: '', title: 'Callbacks', icon: 'icon-calendar', type: 'internal' },
+            'dialer': { url: 'https://enhancedialer.readymode.com', title: 'The Dialer', icon: 'icon-phone', type: 'web' },
+            'gmail': { url: 'https://accounts.google.com/ServiceLogin?service=mail&continue=https://mail.google.com/mail/', title: 'Gmail', icon: 'icon-mail', type: 'web' },
+            'google': { url: 'https://www.google.com', title: 'Google Search', icon: 'icon-search', type: 'web' },
+            'toolkits': { url: 'https://app.insurancetoolkits.com/login', title: 'Ins. Toolkits', icon: 'icon-briefcase', type: 'web' },
+            'ethos': { url: 'https://agents.ethoslife.com/dashboard?earning_page=1&includeDownlines=false', title: 'Ethos', icon: 'icon-shield', type: 'web' },
+            'amam-app': { url: 'https://www.insuranceapplication.com/cgi/webappmobile/login.aspx', title: 'AmAm App', icon: 'icon-file', type: 'web' },
+            'amam-login': { url: 'https://www.americanamicable.com/v4/AgentLogin.php', title: 'AmAm Login', icon: 'icon-lock', type: 'web' },
+            'combined': { url: 'https://chubb.insuranceadmin.com/agent/rate', title: 'Combined', icon: 'icon-layers', type: 'web' },
+            'aetna': { url: 'https://www.aetnaseniorproducts.com/ssibrokerwebaz/agent/home?channel=broker', title: 'Aetna', icon: 'icon-heart', type: 'web' },
+            'closio': { url: 'https://enhance.closio.com/login', title: 'Agent Space', icon: 'icon-monitor', type: 'web' },
+            'whatsapp': { url: 'https://web.whatsapp.com/', title: 'WhatsApp', icon: 'icon-message', type: 'web', ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36' },
+            'script-zac': { url: 'https://docs.google.com/document/d/1GNbv5w9HOD9DH8R_HoD0W6F3GcmdZ2ZvgfUERROTEtY/edit?tab=t.0', title: 'Zaccari Script', icon: 'icon-script', type: 'web' },
+            'script-carter': { url: 'https://docs.google.com/document/d/1Rs_aLp12Y6n3zawEiEqDzb4hbKZGgNRDOLesifPemEA/edit?usp=sharing', title: 'Carter Script', icon: 'icon-script', type: 'web' },
+            'script-solid': { url: 'https://docs.google.com/document/d/1QMHPkX4VZn1PW4V5ycoC-8eg2a7PJ1YMnRDG5HgSwzQ/edit?tab=t.0#heading=h.i7mw78fgdix6', title: 'Solidification', icon: 'icon-script', type: 'web' },
+            'gemini': { url: 'special', title: 'Neural Link (Gemini)', icon: 'icon-brain', type: 'system' }
+        };
+
+        const omniOverlay = document.getElementById('omni-core-overlay');
+        const omniInput = document.getElementById('omni-search');
+        const omniResults = document.getElementById('omni-results');
+        let omniOpen = false;
+        let selectedOmniIndex = 0; 
+
+        ipcRenderer.on('toggle-omni-core', () => {
+            omniOpen = !omniOpen;
+            if (omniOpen) {
+                omniOverlay.style.display = 'flex';
+                setTimeout(() => { omniOverlay.style.opacity = '1'; omniInput.focus(); }, 10);
+                renderOmniResults();
+            } else { closeOmni(); }
+        });
+
+        function closeOmni() {
+            omniOpen = false; omniOverlay.style.opacity = '0';
+            setTimeout(() => { omniOverlay.style.display = 'none'; omniInput.value = ''; }, 200);
+        }
+
+        omniOverlay.addEventListener('click', (e) => { if(e.target === omniOverlay) closeOmni(); });
+        
+        omniInput.addEventListener('keydown', (e) => { 
+            if (e.key === 'Escape' && omniOpen) {
+                closeOmni();
+                return;
+            }
+            
+            const items = omniResults.querySelectorAll('.omni-item');
+            if (items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                items[selectedOmniIndex].classList.remove('selected');
+                selectedOmniIndex = (selectedOmniIndex + 1) % items.length;
+                items[selectedOmniIndex].classList.add('selected');
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                items[selectedOmniIndex].classList.remove('selected');
+                selectedOmniIndex = (selectedOmniIndex - 1 + items.length) % items.length;
+                items[selectedOmniIndex].classList.add('selected');
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                items[selectedOmniIndex].click();
+            }
+        });
+
+        omniInput.addEventListener('input', renderOmniResults);
+
+        function renderOmniResults() {
+            const query = omniInput.value.toLowerCase();
+            omniResults.innerHTML = '';
+            let count = 0;
+            selectedOmniIndex = 0; 
+            
+            for (const [key, data] of Object.entries(appDictionary)) {
+                if (data.title.toLowerCase().includes(query) || key.includes(query)) {
+                    if (count > 5) break;
+                    const el = document.createElement('div'); 
+                    el.className = 'omni-item liquid-glass' + (count === 0 ? ' selected' : '');
+                    el.innerHTML = `<span><svg class="sys-icon"><use href="#${data.icon}"></use></svg></span> <span>Launch: <strong>${data.title}</strong></span>`;
+                    el.onclick = () => { 
+                        if (key === 'gemini') {
+                            document.getElementById('gemini-floating-window').style.display = 'flex';
+                        } else {
+                            openSection(key); 
+                        }
+                        closeOmni(); 
+                    };
+                    omniResults.appendChild(el); count++;
+                }
+            }
+        }
+
+        ipcRenderer.on('open-new-tab', (event, url) => {
+            if (currentSection && currentSection !== 'tracker') buildTab(currentSection, url, false);
+        });
+
+        // --- GEMINI DRAG LOGIC ---
+        const geminiWin = document.getElementById('gemini-floating-window');
+        const dragHandle = document.getElementById('gemini-drag-handle');
+        let isDragging = false, startX, startY, initialX, initialY;
+
+        dragHandle.addEventListener('mousedown', (e) => {
+            if(e.target.closest('button')) return;
+            e.preventDefault();
+            isDragging = true;
+            startX = e.clientX; startY = e.clientY;
+            initialX = geminiWin.offsetLeft; initialY = geminiWin.offsetTop;
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', stopDrag);
+        });
+
+        function onDrag(e) {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            geminiWin.style.left = `${initialX + dx}px`;
+            geminiWin.style.top = `${initialY + dy}px`;
+        }
+
+        function stopDrag() {
+            isDragging = false;
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        // --- QUICK CALLBACK DRAG LOGIC ---
+        const qcWin = document.getElementById('quick-callback-overlay');
+        const qcDragHandle = document.getElementById('qc-drag-handle');
+        let qcIsDragging = false, qcStartX, qcStartY, qcInitialX, qcInitialY;
+
+        qcDragHandle.addEventListener('mousedown', (e) => {
+            if(e.target.closest('button') || e.target.closest('input')) return;
+            e.preventDefault();
+            qcIsDragging = true;
+            qcStartX = e.clientX; qcStartY = e.clientY;
+            
+            qcInitialX = qcWin.offsetLeft; 
+            qcInitialY = qcWin.offsetTop;
+            
+            qcWin.style.left = qcInitialX + 'px';
+            qcWin.style.top = qcInitialY + 'px';
+            qcWin.style.right = 'auto'; 
+            qcWin.style.transform = 'none';
+
+            document.addEventListener('mousemove', qcOnDrag);
+            document.addEventListener('mouseup', qcStopDrag);
+        });
+
+        function qcOnDrag(e) {
+            if (!qcIsDragging) return;
+            const dx = e.clientX - qcStartX;
+            const dy = e.clientY - qcStartY;
+            qcWin.style.left = `${qcInitialX + dx}px`;
+            qcWin.style.top = `${qcInitialY + dy}px`;
+        }
+
+        function qcStopDrag() {
+            qcIsDragging = false;
+            document.removeEventListener('mousemove', qcOnDrag);
+            document.removeEventListener('mouseup', qcStopDrag);
+        }
+
+        // --- THE SCRIPT OVERLAY TOGGLE LOGIC ---
+        const overlayMemory = {}; 
+        let currentOverlayScript = null; 
+
+        function openScriptOverlay(scriptKey) {
+            const overlay = document.getElementById('script-overlay');
+            const container = document.getElementById('overlay-webview-container');
+            const titleEl = document.getElementById('overlay-script-title');
+            
+            if (overlay.classList.contains('open') && currentOverlayScript === scriptKey) {
+                closeScriptOverlay();
+                return;
+            }
+
+            currentOverlayScript = scriptKey;
+            titleEl.innerText = appDictionary[scriptKey].title;
+
+            Object.values(overlayMemory).forEach(wv => wv.style.display = 'none');
+
+            if (!overlayMemory[scriptKey]) {
+                const wv = document.createElement('webview');
+                wv.src = appDictionary[scriptKey].url;
+                wv.style.width = '100%';
+                wv.style.height = '100%';
+                wv.style.border = 'none';
+                wv.style.background = '#fff';
+                container.appendChild(wv);
+                overlayMemory[scriptKey] = wv;
+            }
+            
+            overlayMemory[scriptKey].style.display = 'flex';
+
+            overlay.style.display = 'flex';
+            setTimeout(() => overlay.classList.add('open'), 10);
+            
+            extractLeadDataForOverlay();
+        }
+
+        function closeScriptOverlay() {
+            const overlay = document.getElementById('script-overlay');
+            overlay.classList.remove('open');
+            currentOverlayScript = null; 
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 400);
+        }
+
+        function extractLeadDataForOverlay() {
+            document.getElementById('overlay-state').innerText = 'Scanning...';
+            document.getElementById('overlay-time').innerText = 'Scanning...';
+            
+            if (!activeMemory['dialer'] || !activeMemory['dialer'].tabs.length) return;
+            
+            const dialerId = activeMemory['dialer'].activeTabId;
+            const wv = document.getElementById(dialerId);
+            
+            if (wv) {
+                const scrapeScript = `
+                    (function() {
+                        let s = 'Not Found', c = 'Not Found';
+                        let inputs = document.querySelectorAll('input');
+                        
+                        for (let inp of inputs) {
+                            let val = inp.value ? inp.value.trim() : '';
+                            if (!val) continue;
+                            
+                            let parentText = inp.closest('tr') ? inp.closest('tr').innerText.toLowerCase() : (inp.parentElement ? inp.parentElement.innerText.toLowerCase() : '');
+                            let attrs = (inp.id + ' ' + inp.name).toLowerCase();
+                            
+                            if (s === 'Not Found' && (parentText.includes('state') || attrs.includes('state')) && val.length === 2) {
+                                s = val.toUpperCase();
+                            }
+                            if (c === 'Not Found' && (parentText.includes('coverage') || attrs.includes('coverage')) && (val.includes('202') || val.includes('AM') || val.includes('PM'))) {
+                                c = val;
+                            }
+                        }
+                        return { state: s, time: c };
+                    })();
+                `;
+                
+                wv.executeJavaScript(scrapeScript)
+                  .then(res => {
+                      document.getElementById('overlay-state').innerText = res.state || 'N/A';
+                      document.getElementById('overlay-time').innerText = res.time || 'N/A';
+                  })
+                  .catch(err => {
+                      document.getElementById('overlay-state').innerText = 'Read Error';
+                      document.getElementById('overlay-time').innerText = 'Read Error';
+                  });
+            }
+        }
+
+        // --- QUICK CALLBACK & HOLOGRAPHIC SUCTION LOGIC ---
+        function toggleQuickCallback() {
+            const qc = document.getElementById('quick-callback-overlay');
+            if (qc.classList.contains('open')) {
+                qc.classList.remove('open');
+                setTimeout(() => {
+                    qc.style.display = 'none';
+                    qc.style.left = '';
+                    qc.style.top = '60px';
+                    qc.style.right = '24px';
+                    qc.style.transform = '';
+                }, 300);
+            } else {
+                qc.style.display = 'flex';
+                qc.style.flexDirection = 'column';
+                void qc.offsetWidth;
+                qc.classList.add('open');
+            }
+        }
+
+        function qcUpdateAgentPhone() {
+            const agent = document.getElementById('qc-agentName').value;
+            document.getElementById('qc-agentPhone').value = (agent === 'Danny Koeth') ? '(352) 652-1344' : '(352) 949-3003';
+        }
+
+        function applyFlash(elementId) {
+            const el = document.getElementById(elementId);
+            if(el) {
+                el.classList.remove('flash-input');
+                void el.offsetWidth; 
+                el.classList.add('flash-input');
+            }
+        }
+
+        function triggerQuickAutoFill(e) {
+            if(e) e.stopPropagation();
+            if (!activeMemory['dialer'] || !activeMemory['dialer'].tabs.length) return;
+            
+            const dialerId = activeMemory['dialer'].activeTabId;
+            const wv = document.getElementById(dialerId);
+            if (!wv) return;
+
+            const btn = document.getElementById('qc-autofill-btn');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<svg class="sys-icon-sm spin"><use href="#icon-refresh"></use></svg> Extracting...';
+
+            const scrapeScript = `
+                (function() {
+                    let fn='', ln='', ph='', st='';
+                    let inputs = document.querySelectorAll('input');
+                    
+                    for (let inp of inputs) {
+                        let val = inp.value ? inp.value.trim() : '';
+                        if (!val) continue;
+                        
+                        let parentText = inp.closest('tr') ? inp.closest('tr').innerText.toLowerCase() : (inp.parentElement ? inp.parentElement.innerText.toLowerCase() : '');
+                        let attrs = (inp.id + ' ' + inp.name).toLowerCase();
+
+                        if (!fn && (parentText.includes('first name') || attrs.includes('first'))) fn = val;
+                        if (!ln && (parentText.includes('last name') || attrs.includes('last'))) ln = val;
+                        if (!ph && (parentText.includes('phone') || attrs.includes('phone')) && val.match(/\\d/)) ph = val;
+                        if (!st && (parentText.includes('state') || attrs.includes('state')) && val.length === 2) st = val.toUpperCase();
+                    }
+                    
+                    if (!ph) {
+                        let links = document.querySelectorAll('a');
+                        for (let a of links) {
+                            let txt = a.innerText.trim();
+                            if (txt.match(/^\\(?\\d{3}\\)?\\s?\\d{3}-\\d{4}$/)) {
+                                ph = txt; break;
+                            }
+                        }
+                    }
+                    
+                    return { name: (fn + ' ' + ln).trim(), phone: ph, state: st };
+                })();
+            `;
+
+            wv.executeJavaScript(scrapeScript).then(res => {
+                const browserView = document.getElementById('browser-view');
+                const qcPanel = document.getElementById('quick-callback-overlay');
+                
+                // 1. Create Glowing Hologram Outline of the Dialer
+                const ghost = document.createElement('div');
+                const bvRect = browserView.getBoundingClientRect();
+                ghost.style.position = 'fixed';
+                ghost.style.left = bvRect.left + 'px';
+                ghost.style.top = bvRect.top + 'px';
+                ghost.style.width = bvRect.width + 'px';
+                ghost.style.height = bvRect.height + 'px';
+                ghost.style.background = 'rgba(6, 182, 212, 0.15)';
+                ghost.style.border = '2px solid #06b6d4';
+                ghost.style.borderRadius = '16px';
+                ghost.style.boxShadow = '0 0 40px rgba(6, 182, 212, 0.4), inset 0 0 40px rgba(6, 182, 212, 0.4)';
+                ghost.style.zIndex = 9999;
+                ghost.style.pointerEvents = 'none';
+                document.body.appendChild(ghost);
+
+                // 2. Hide Dialer instantly to reveal the spinning Brain
+                browserView.style.opacity = '0.05'; 
+
+                // 3. Animate the Ghost Sucking into the Panel
+                const qcRect = qcPanel.getBoundingClientRect();
+                const targetX = qcRect.left + (qcRect.width / 2) - (bvRect.width / 2);
+                const targetY = qcRect.top + (qcRect.height / 2) - (bvRect.height / 2);
+
+                const anim = ghost.animate([
+                    { transform: 'scale(1) translate(0px, 0px)', borderRadius: '16px', opacity: 1 },
+                    { transform: 'scale(0.8) translate(0px, 20px)', borderRadius: '30px', opacity: 1, offset: 0.2 },
+                    { transform: `translate(${targetX}px, ${targetY}px) scale(0.02)`, borderRadius: '50%', opacity: 0.8 }
+                ], {
+                    duration: 750,
+                    easing: 'cubic-bezier(0.5, 0, 0.2, 1)',
+                    fill: 'forwards'
+                });
+
+                anim.onfinish = () => {
+                    ghost.remove();
+                    btn.innerHTML = originalHTML;
+
+                    // Fade real dialer back in
+                    browserView.style.opacity = '1';
+
+                    // Auto-Populate Form and Flash
+                    if (res.name) { document.getElementById('qc-clientName').value = res.name; applyFlash('qc-clientName'); }
+                    if (res.phone) { document.getElementById('qc-clientPhone').value = res.phone; applyFlash('qc-clientPhone'); }
+                    if (res.state) {
+                        let stateSelect = document.getElementById('qc-clientState');
+                        stateSelect.value = res.state;
+                        applyFlash('qc-clientState');
+                    }
+                    document.getElementById('qc-callbackDate').focus();
+                };
+
+            }).catch(err => {
+                btn.innerHTML = originalHTML;
+                console.error("Auto-Callback Read Error:", err);
+            });
+        }
+
+        // --- SUBMITTING THE QUICK CALLBACK FORM ---
+        document.getElementById('qc-callback-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const state = document.getElementById('qc-clientState').value; const offset = stateTimeZones[state] || 0;
+            const enteredTime = document.getElementById('qc-callbackTime').value; const tzContext = document.getElementById('qc-timeZoneContext').value;
+
+            let displayTime24 = (tzContext === 'client') ? adjustTime(enteredTime, offset, false) : enteredTime;
+            let clientTime24 = (tzContext === 'client') ? enteredTime : adjustTime(enteredTime, offset, true);
+
+            const newCallback = {
+                id: Date.now(), agent: document.getElementById('qc-agentName').value, agentPhone: document.getElementById('qc-agentPhone').value, 
+                name: document.getElementById('qc-clientName').value, phone: document.getElementById('qc-clientPhone').value, state: state,
+                date: document.getElementById('qc-callbackDate').value, displayTime24: displayTime24, displayTime12: toAMPM(displayTime24), 
+                clientTime12: toAMPM(clientTime24), policy: document.getElementById('qc-policyType').value, notes: document.getElementById('qc-notes').value, sms: document.getElementById('qc-smsConfirm').value
+            };
+            
+            callbacks.push(newCallback); saveCallbacks();
+            const [cbYear, cbMonth] = newCallback.date.split('-'); currentDate.setFullYear(parseInt(cbYear), parseInt(cbMonth) - 1, 1);
+            renderCalendar(); 
+            this.reset(); qcUpdateAgentPhone();
+
+            // Smooth Fly-to-Sidebar Animation
+            const formPanel = document.getElementById('quick-callback-overlay');
+            const targetBtn = document.querySelector('.sidebar-btn[data-section="tracker"]');
+            
+            if (formPanel && targetBtn) {
+                const srcRect = formPanel.getBoundingClientRect();
+                const tgtRect = targetBtn.getBoundingClientRect();
+                
+                const ghost = formPanel.cloneNode(true);
+                ghost.style.position = 'fixed';
+                ghost.style.left = srcRect.left + 'px';
+                ghost.style.top = srcRect.top + 'px';
+                ghost.style.width = srcRect.width + 'px';
+                ghost.style.height = srcRect.height + 'px';
+                ghost.style.zIndex = 9999;
+                ghost.style.pointerEvents = 'none';
+                ghost.style.margin = '0';
+                ghost.style.transform = 'translateY(0)';
+                document.body.appendChild(ghost);
+                
+                const targetX = tgtRect.left + (tgtRect.width / 2) - (srcRect.width / 2);
+                const targetY = tgtRect.top + (tgtRect.height / 2) - (srcRect.height / 2);
+
+                ghost.animate([
+                    { transform: 'scale(1) translate(0px, 0px)', opacity: 1 },
+                    { transform: `translate(${targetX}px, ${targetY}px) scale(0.05)`, opacity: 0 }
+                ], {
+                    duration: 600,
+                    easing: 'cubic-bezier(0.5, 0, 0.2, 1)',
+                    fill: 'forwards'
+                }).onfinish = () => ghost.remove();
+            }
+
+            toggleQuickCallback(); 
+
+            if (newCallback.sms !== 'None' && ZAPIER_WEBHOOK_URL) {
+                let sendTime = new Date(`${newCallback.date}T${newCallback.displayTime24}`);
+                if (newCallback.sms === '1 Day Prior') sendTime.setHours(sendTime.getHours() - 24);
+                else if (newCallback.sms === '2 Hours Prior') sendTime.setHours(sendTime.getHours() - 2);
+
+                fetch(ZAPIER_WEBHOOK_URL, { method: 'POST', body: JSON.stringify({ agent_name: newCallback.agent, agent_phone: newCallback.agentPhone, client_name: newCallback.name, phone_number: newCallback.phone, policy_type: newCallback.policy, appointment_date: newCallback.date, appointment_time: newCallback.clientTime12, send_text_at: sendTime.toISOString() }) }).catch(err => console.error('Webhook Error:', err));
+            }
+        });
+
+        // --- CLEAR FORM FUNCTIONS ---
+        function clearMainForm() {
+            document.getElementById('callback-form').reset();
+            updateAgentPhone();
+        }
+        function clearQCForm() {
+            document.getElementById('qc-callback-form').reset();
+            qcUpdateAgentPhone();
+        }
+
+        // --- 4. APP LAYOUT FLOW ---
+        const activeMemory = {};
+        let currentSection = null;
+
+        function goHome() {
+            document.getElementById('home-screen').style.opacity = '1';
+            document.getElementById('home-screen').style.pointerEvents = 'auto';
+            document.getElementById('home-screen').style.transform = 'scale(1)';
+            document.getElementById('main-app-layout').style.display = 'none';
+            document.getElementById('webgl-container').style.opacity = '1';
+            document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active-btn'));
+            currentSection = null;
+        }
+
+        function openSection(sectionId) {
+            document.getElementById('home-screen').style.opacity = '0';
+            document.getElementById('home-screen').style.pointerEvents = 'none';
+            document.getElementById('home-screen').style.transform = 'scale(0.95)';
+            document.getElementById('webgl-container').style.opacity = '0'; 
+            document.getElementById('main-app-layout').style.display = 'flex';
+            
+            document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active-btn'));
+            const activeBtn = document.querySelector(`.sidebar-btn[data-section="${sectionId}"]`);
+            if(activeBtn) activeBtn.classList.add('active-btn');
+
+            if (sectionId === 'tracker') {
+                document.getElementById('dashboard-view').style.display = 'flex';
+                document.getElementById('browser-view').style.display = 'none';
+                currentSection = null; return;
+            }
+
+            document.getElementById('dashboard-view').style.display = 'none';
+            document.getElementById('browser-view').style.display = 'flex';
+            currentSection = sectionId;
+
+            // Target Visibility for Dialer specific tools
+            if (sectionId === 'dialer') {
+                document.getElementById('cookie-btn').style.display = 'flex';
+                document.getElementById('dialer-script-controls').style.display = 'flex';
+            } else {
+                document.getElementById('cookie-btn').style.display = 'none';
+                document.getElementById('dialer-script-controls').style.display = 'none';
+                closeScriptOverlay(); 
+                
+                const qc = document.getElementById('quick-callback-overlay');
+                qc.classList.remove('open');
+                qc.style.display = 'none';
+            }
+
+            if (!activeMemory[sectionId]) {
+                activeMemory[sectionId] = { tabs: [], activeTabId: null };
+                buildTab(sectionId, appDictionary[sectionId].url, true);
+            }
+
+            renderTopBar(); displayActiveWebview();
+        }
+
+        function clearDialerCookies() {
+            const icon = document.getElementById('cookie-btn');
+            icon.classList.add('spin');
+            ipcRenderer.send('clear-dialer-cookies');
+        }
+
+        ipcRenderer.on('dialer-cookies-cleared', () => {
+            const icon = document.getElementById('cookie-btn');
+            icon.classList.remove('spin');
+            if (currentSection === 'dialer' && activeMemory['dialer'].activeTabId) {
+                const wv = document.getElementById(activeMemory['dialer'].activeTabId);
+                if (wv) wv.reload();
+            }
+        });
+
+        // --- 5. TABS & WEBVIEWS ---
+        function buildTab(section, targetUrl, isMain) {
+            const uniqueId = section + '-' + Date.now();
+            const dict = appDictionary[section];
+
+            const webview = document.createElement('webview');
+            webview.id = uniqueId; webview.className = 'app-webview'; webview.src = targetUrl;
+            
+            webview.setAttribute('allowpopups', 'true');
+            if (dict && dict.ua) webview.setAttribute('useragent', dict.ua);
+            
+            document.getElementById('webview-container').appendChild(webview);
+
+            webview.addEventListener('page-title-updated', (e) => {
+                const tabData = activeMemory[section].tabs.find(t => t.id === uniqueId);
+                if (tabData && !isMain) {
+                    tabData.title = e.title;
+                    const titleTextEl = document.getElementById('title-' + uniqueId);
+                    if(titleTextEl) titleTextEl.innerText = e.title;
+                }
+            });
+
+            activeMemory[section].tabs.push({ id: uniqueId, title: isMain ? dict.title : 'Loading...', isMain: isMain, wvElement: webview });
+            activeMemory[section].activeTabId = uniqueId;
+            
+            if (currentSection === section) { renderTopBar(); displayActiveWebview(); }
+        }
+
+        function renderTopBar() {
+            const container = document.getElementById('tab-container'); container.innerHTML = '';
+            if (!currentSection || !activeMemory[currentSection]) return;
+            const dict = appDictionary[currentSection];
+
+            activeMemory[currentSection].tabs.forEach(tab => {
+                const tabEl = document.createElement('div');
+                tabEl.className = 'glass-tab' + (tab.id === activeMemory[currentSection].activeTabId ? ' active-tab' : '');
+                tabEl.onclick = () => { activeMemory[currentSection].activeTabId = tab.id; renderTopBar(); displayActiveWebview(); };
+
+                const titleSpan = document.createElement('span'); titleSpan.className = 'tab-title'; titleSpan.id = 'title-' + tab.id;
+                
+                if(tab.isMain) {
+                    tabEl.innerHTML = `<svg class="sys-icon-sm"><use href="#${dict.icon}"></use></svg>`;
+                } else {
+                    tabEl.innerHTML = `<svg class="sys-icon-sm"><use href="#icon-file"></use></svg>`;
+                }
+                
+                titleSpan.innerText = tab.title; 
+                tabEl.appendChild(titleSpan);
+
+                if (!tab.isMain) {
+                    const closeBtn = document.createElement('div'); closeBtn.className = 'tab-x'; 
+                    closeBtn.innerHTML = '<svg class="sys-icon-sm"><use href="#icon-x"></use></svg>';
+                    closeBtn.onclick = (e) => closeTab(currentSection, tab.id, e); tabEl.appendChild(closeBtn);
+                }
+                container.appendChild(tabEl);
+            });
+        }
+
+        function closeTab(section, tabId, event) {
+            event.stopPropagation(); const mem = activeMemory[section]; const index = mem.tabs.findIndex(t => t.id === tabId);
+            if (index > -1 && !mem.tabs[index].isMain) {
+                mem.tabs[index].wvElement.remove(); mem.tabs.splice(index, 1);
+                if (mem.activeTabId === tabId) mem.activeTabId = mem.tabs[0].id;
+                renderTopBar(); displayActiveWebview();
+            }
+        }
+
+        function displayActiveWebview() {
+            document.querySelectorAll('.app-webview').forEach(wv => wv.classList.remove('active-wv'));
+            if (currentSection && activeMemory[currentSection].activeTabId) {
+                const targetWv = document.getElementById(activeMemory[currentSection].activeTabId);
+                if(targetWv) targetWv.classList.add('active-wv');
+            }
+        }
+
+        function browserBack() {
+            if (!currentSection) return; const wv = document.getElementById(activeMemory[currentSection].activeTabId);
+            if (wv) { try { wv.goBack(); } catch(e) {} }
+        }
+        function browserForward() {
+            if (!currentSection) return; const wv = document.getElementById(activeMemory[currentSection].activeTabId);
+            if (wv) { try { wv.goForward(); } catch(e) {} }
+        }
+        function browserRefresh() {
+            if (!currentSection) return; const wv = document.getElementById(activeMemory[currentSection].activeTabId);
+            if (wv) wv.reload();
+            const icon = document.getElementById('refresh-icon'); icon.classList.remove('spin'); void icon.offsetWidth; icon.classList.add('spin');
+        }
+
+        /* --- 6. THE TRACKER LOGIC --- */
+        const ZAPIER_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/27301017/4tacgbz/';
+        const stateTimeZones = { "AL": -1, "AK": -4, "AZ": -2, "AR": -1, "CA": -3, "CO": -2, "CT": 0, "DE": 0, "FL": 0, "GA": 0, "HI": -5, "ID": -2, "IL": -1, "IN": 0, "IA": -1, "KS": -1, "KY": 0, "LA": -1, "ME": 0, "MD": 0, "MA": 0, "MI": 0, "MN": -1, "MS": -1, "MO": -1, "MT": -2, "NE": -1, "NV": -3, "NH": 0, "NJ": 0, "NM": -2, "NY": 0, "NC": 0, "ND": -1, "OH": 0, "OK": -1, "OR": -3, "PA": 0, "RI": 0, "SC": 0, "SD": -1, "TN": -1, "TX": -1, "UT": -2, "VT": 0, "VA": 0, "WA": -3, "WV": 0, "WI": -1, "WY": -2 };
+
+        let callbacks = JSON.parse(localStorage.getItem('gfm_callbacks')) || [];
+        let currentDate = new Date();
+
+        function updateAgentPhone() {
+            const agent = document.getElementById('agentName').value;
+            document.getElementById('agentPhone').value = (agent === 'Danny Koeth') ? '(352) 652-1344' : '(352) 949-3003';
+        }
+
+        function saveCallbacks() { localStorage.setItem('gfm_callbacks', JSON.stringify(callbacks)); }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid'); grid.innerHTML = '';
+            const year = currentDate.getFullYear(); const month = currentDate.getMonth();
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            document.getElementById('month-year').innerText = `${monthNames[month]} ${year}`;
+
+            const firstDayIndex = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const totalCells = Math.ceil((firstDayIndex + daysInMonth) / 7) * 7;
+            const today = new Date(); const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+
+            for (let i = 0; i < totalCells; i++) {
+                let dayDiv = document.createElement('div'); dayDiv.className = 'day-node liquid-glass';
+                let dateNum = i - firstDayIndex + 1; 
+
+                if (dateNum > 0 && dateNum <= daysInMonth) {
+                    dayDiv.classList.add('active');
+                    if (isCurrentMonth && dateNum === today.getDate()) dayDiv.classList.add('today');
+                    
+                    dayDiv.innerHTML = `<div class="day-num">${dateNum}</div>`;
+                    let dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(dateNum).padStart(2, '0')}`;
+                    let daysCallbacks = callbacks.filter(cb => cb.date === dateString);
+                    
+                    if (daysCallbacks.length > 0) {
+                        let badge = document.createElement('div'); badge.className = 'mission-badge';
+                        badge.innerText = `${daysCallbacks.length} Pending`; dayDiv.appendChild(badge);
+                    }
+                    dayDiv.onclick = () => openModal(dateString, daysCallbacks);
+                }
+                grid.appendChild(dayDiv);
+            }
+        }
+
+        document.getElementById('prev-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() - 1); renderCalendar(); });
+        document.getElementById('next-month').addEventListener('click', () => { currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar(); });
+
+        function adjustTime(timeStr, offsetHours, addOffset) {
+            let [h, m] = timeStr.split(':').map(Number); h = addOffset ? h + offsetHours : h - offsetHours;
+            if (h >= 24) h -= 24; if (h < 0) h += 24; return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        }
+        function toAMPM(time24) {
+            let [h, m] = time24.split(':'); h = parseInt(h); let ampm = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${m} ${ampm}`;
+        }
+
+        function openModal(date, daysCallbacks) {
+            document.getElementById('detailsModal').style.display = 'flex'; document.getElementById('modalDateTitle').innerText = `Callbacks for ${date}`;
+            const list = document.getElementById('modalList'); list.innerHTML = '';
+            
+            if (daysCallbacks.length === 0) { list.innerHTML = '<p style="color:var(--text-muted);">No entries found.</p>'; return; }
+
+            daysCallbacks.sort((a, b) => (a.displayTime24 || a.time).localeCompare(b.displayTime24 || b.time)).forEach(cb => {
+                let item = document.createElement('div'); item.className = 'data-card liquid-glass';
+                item.innerHTML = `<div><strong style="color:var(--neon-cyan); font-size: 1.2rem;">${cb.displayTime12} EST | ${cb.name}</strong><br>
+                        <span style="font-size:1rem; color:#fff; display:block; margin-top:6px;">${cb.phone} | ${cb.policy} | State: ${cb.state} (Local: ${cb.clientTime12})</span>
+                        <small style="color:var(--text-muted); display:block; margin-top:6px;">Agent: ${cb.agent} (${cb.agentPhone}) | SMS: ${cb.sms}</small>
+                        ${cb.notes ? `<div style="color:var(--text-main); font-size:0.9rem; margin-top:10px; border-top: 1px dashed rgba(255,255,255,0.15); padding-top: 10px;"><strong>Note:</strong> ${cb.notes}</div>` : ''}</div>
+                    <button onclick="deleteCallback(${cb.id})">Cancel</button>`;
+                list.appendChild(item);
+            });
+        }
+
+        function deleteCallback(id) { callbacks = callbacks.filter(x => x.id !== id); saveCallbacks(); renderCalendar(); document.getElementById('detailsModal').style.display = 'none'; }
+        
+        function exportData(filename = `gfm_engine_sys_backup_${new Date().toISOString().slice(0,10)}.json`) { 
+            if(callbacks.length === 0) return; const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(callbacks, null, 2)); a.download = filename; a.click(); 
+        }
+
+        function importData(e) {
+            const reader = new FileReader(); reader.onload = function(ev) { try { callbacks = JSON.parse(ev.target.result); saveCallbacks(); renderCalendar(); alert('Data restored successfully!'); } catch(err) { alert('Invalid JSON file.'); } }; reader.readAsText(e.target.files[0]); e.target.value = '';
+        }
+
+        function performDailyMaintenance() {
+            const now = new Date(); const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`; 
+            const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate() - 7);
+            const purgeThreshold = `${weekAgo.getFullYear()}-${String(weekAgo.getMonth() + 1).padStart(2, '0')}-${String(weekAgo.getDate()).padStart(2, '0')}`;
+            const lastMaintenance = localStorage.getItem('gfm_last_maintenance');
+
+            if (lastMaintenance !== localToday) {
+                if (callbacks.length > 0) exportData(`gfm_auto_backup_${localToday}.json`);
+                const initialLength = callbacks.length; callbacks = callbacks.filter(cb => cb.date >= purgeThreshold);
+                if (callbacks.length !== initialLength) saveCallbacks();
+                localStorage.setItem('gfm_last_maintenance', localToday);
+            }
+        }
+
+        performDailyMaintenance(); renderCalendar(); updateAgentPhone(); qcUpdateAgentPhone();
+        const opts = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('current-date-display').innerText = new Date().toLocaleDateString('en-US', opts);
+    </script>
+</body>
+</html>
